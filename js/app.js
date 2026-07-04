@@ -3,14 +3,32 @@ import * as THREE from 'three';
 const RED = 0xe92323;
 const RED_STRONG = 0xff302b;
 
-// v29: modo rendimiento automático para celulares/equipos de gama baja.
-// Mantiene la experiencia visual, pero baja carga de GPU/CPU cuando el dispositivo lo necesita.
+// v30: rendimiento adaptativo real.
+// Mantiene calidad alta en PC/equipos potentes, y simplifica efectos solo en gama baja
+// para que el scroll y los toques no deformen ni ralenticen la experiencia.
 const DEVICE_MEMORY = navigator.deviceMemory || 4;
 const CPU_CORES = navigator.hardwareConcurrency || 4;
 const SAVE_DATA = !!navigator.connection?.saveData;
 const REDUCED_MOTION = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches || false;
-const LOW_POWER = SAVE_DATA || REDUCED_MOTION || DEVICE_MEMORY <= 3 || CPU_CORES <= 4 || Math.min(window.innerWidth, window.innerHeight) <= 430;
+const COARSE_POINTER = window.matchMedia?.('(pointer: coarse)')?.matches || false;
+const VIEWPORT_MIN = Math.min(window.innerWidth, window.innerHeight);
+const VIEWPORT_MAX = Math.max(window.innerWidth, window.innerHeight);
+
+function detectPerformanceTier(){
+  if (SAVE_DATA || REDUCED_MOTION || DEVICE_MEMORY <= 2 || CPU_CORES <= 2) return 'low';
+  if ((COARSE_POINTER && DEVICE_MEMORY <= 4) || CPU_CORES <= 4 || VIEWPORT_MIN <= 430) return 'medium';
+  if (DEVICE_MEMORY >= 8 && CPU_CORES >= 8 && VIEWPORT_MAX >= 900) return 'high';
+  return 'medium';
+}
+
+const PERF_TIER = detectPerformanceTier();
+const LOW_POWER = PERF_TIER === 'low';
+const MID_POWER = PERF_TIER === 'medium';
+const HIGH_POWER = PERF_TIER === 'high';
+document.documentElement.dataset.performance = PERF_TIER;
 document.documentElement.classList.toggle('perf-lite', LOW_POWER);
+document.documentElement.classList.toggle('perf-medium', MID_POWER);
+document.documentElement.classList.toggle('perf-high', HIGH_POWER);
 
 const canvas = document.getElementById('planetCanvas');
 const trigger = document.getElementById('planetTrigger');
@@ -43,11 +61,11 @@ const CHILE_TARGET_ROTATION_X = THREE.MathUtils.degToRad(CHILE_LAT);
 
 const renderer = new THREE.WebGLRenderer({
   canvas,
-  antialias: !LOW_POWER,
+  antialias: HIGH_POWER,
   alpha: true,
-  powerPreference: LOW_POWER ? 'low-power' : 'high-performance'
+  powerPreference: HIGH_POWER ? 'high-performance' : 'low-power'
 });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, LOW_POWER ? 1 : 1.25));
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, HIGH_POWER ? 1.35 : MID_POWER ? 1.1 : 1));
 renderer.setClearColor(0x000000, 0);
 
 const scene = new THREE.Scene();
@@ -60,12 +78,12 @@ scene.add(globeGroup);
 const loader = new THREE.TextureLoader();
 const worldTexture = loader.load('assets/textures/world-map-red.png');
 worldTexture.colorSpace = THREE.SRGBColorSpace;
-worldTexture.anisotropy = LOW_POWER ? 1 : 4;
+worldTexture.anisotropy = HIGH_POWER ? 4 : 1;
 worldTexture.wrapS = THREE.RepeatWrapping;
 worldTexture.wrapT = THREE.ClampToEdgeWrapping;
 
-const SPHERE_SEGMENTS = LOW_POWER ? 48 : 96;
-const CLOUD_SEGMENTS = LOW_POWER ? 40 : 72;
+const SPHERE_SEGMENTS = HIGH_POWER ? 96 : MID_POWER ? 64 : 42;
+const CLOUD_SEGMENTS = HIGH_POWER ? 72 : MID_POWER ? 52 : 32;
 const earthGeo = new THREE.SphereGeometry(1, SPHERE_SEGMENTS, SPHERE_SEGMENTS);
 const earthMat = new THREE.MeshStandardMaterial({
   color: 0x180303,
@@ -112,36 +130,36 @@ function createChileMarker(){
 const cloudTexture = createCloudTexture();
 const clouds = new THREE.Mesh(
   new THREE.SphereGeometry(1.012, CLOUD_SEGMENTS, CLOUD_SEGMENTS),
-  new THREE.MeshBasicMaterial({ map: cloudTexture, transparent: true, opacity: LOW_POWER ? 0.09 : 0.16, depthWrite: false, blending: THREE.AdditiveBlending })
+  new THREE.MeshBasicMaterial({ map: cloudTexture, transparent: true, opacity: HIGH_POWER ? 0.16 : MID_POWER ? 0.11 : 0.07, depthWrite: false, blending: THREE.AdditiveBlending })
 );
 globeGroup.add(clouds);
 
 const atmosphere = new THREE.Mesh(
   new THREE.SphereGeometry(1.04, SPHERE_SEGMENTS, SPHERE_SEGMENTS),
-  new THREE.MeshBasicMaterial({ color: RED_STRONG, transparent: true, opacity: LOW_POWER ? 0.08 : 0.13, side: THREE.BackSide, blending: THREE.AdditiveBlending })
+  new THREE.MeshBasicMaterial({ color: RED_STRONG, transparent: true, opacity: HIGH_POWER ? 0.13 : MID_POWER ? 0.09 : 0.06, side: THREE.BackSide, blending: THREE.AdditiveBlending })
 );
 globeGroup.add(atmosphere);
 
 const rim = new THREE.Mesh(
   new THREE.SphereGeometry(1.025, SPHERE_SEGMENTS, SPHERE_SEGMENTS),
-  new THREE.MeshBasicMaterial({ color: RED_STRONG, transparent: true, opacity: LOW_POWER ? 0.028 : 0.055, wireframe: false, blending: THREE.AdditiveBlending })
+  new THREE.MeshBasicMaterial({ color: RED_STRONG, transparent: true, opacity: HIGH_POWER ? 0.055 : MID_POWER ? 0.035 : 0.02, wireframe: false, blending: THREE.AdditiveBlending })
 );
 globeGroup.add(rim);
 
 const stars = createStars();
 scene.add(stars);
 
-const keyLight = new THREE.PointLight(RED_STRONG, LOW_POWER ? 24 : 38, 9);
+const keyLight = new THREE.PointLight(RED_STRONG, HIGH_POWER ? 38 : MID_POWER ? 28 : 18, 9);
 keyLight.position.set(2.5, 1.1, 2.5);
 scene.add(keyLight);
-const fillLight = new THREE.AmbientLight(0x3a0505, LOW_POWER ? 1.65 : 2.2);
+const fillLight = new THREE.AmbientLight(0x3a0505, HIGH_POWER ? 2.2 : MID_POWER ? 1.8 : 1.45);
 scene.add(fillLight);
 
 function createCloudTexture(){
-  const c = document.createElement('canvas'); c.width = LOW_POWER ? 512 : 1024; c.height = LOW_POWER ? 256 : 512;
+  const c = document.createElement('canvas'); c.width = HIGH_POWER ? 1024 : 512; c.height = HIGH_POWER ? 512 : 256;
   const ctx = c.getContext('2d');
   ctx.clearRect(0,0,c.width,c.height);
-  for(let i=0;i<(LOW_POWER ? 38 : 100);i++){
+  for(let i=0;i<(HIGH_POWER ? 100 : MID_POWER ? 56 : 30);i++){
     const x=Math.random()*c.width, y=Math.random()*c.height, rx=40+Math.random()*130, ry=8+Math.random()*22;
     const g=ctx.createRadialGradient(x,y,0,x,y,rx);
     g.addColorStop(0,'rgba(255,210,210,.22)'); g.addColorStop(1,'rgba(255,210,210,0)');
@@ -151,7 +169,7 @@ function createCloudTexture(){
 }
 
 function createStars(){
-  const count = LOW_POWER ? 240 : 620;
+  const count = HIGH_POWER ? 620 : MID_POWER ? 360 : 180;
   const geo = new THREE.BufferGeometry();
   const pos = new Float32Array(count * 3);
   for(let i=0;i<count;i++){
@@ -215,7 +233,7 @@ function animate(time){
 
     if(p > 0.80){
       mapScene.classList.add('is-visible');
-  requestAnimationFrame(() => { resizeSky(); setTimeout(resizeSky, 250); });
+  requestAnimationFrame(() => { resizeSky(true); setTimeout(() => resizeSky(true), 250); });
     }
     if(p > 0.90){
       intro.classList.add('is-leaving');
@@ -382,8 +400,11 @@ let shootingStars = [];
 let skyStartTime = null;
 let lastShootingStar = 0;
 let lastSkyDraw = 0;
-const SKY_FPS = LOW_POWER ? 18 : 30;
-const SKY_STAR_COUNT = LOW_POWER ? 360 : 760;
+let skySize = { w: Math.max(1, window.innerWidth || 1), h: Math.max(1, window.innerHeight || 1), dpr: 1 };
+let scrollFreezeUntil = 0;
+let skyResizeRaf = null;
+const SKY_FPS = HIGH_POWER ? 30 : MID_POWER ? 24 : 18;
+const SKY_STAR_COUNT = HIGH_POWER ? 760 : MID_POWER ? 480 : 260;
 const constellationDrawDuration = 30000;
 const constellationHoldDuration = 4500;
 const constellationFadeDuration = 6500;
@@ -424,7 +445,7 @@ const constellations = [
 
 function initSky(){
   if(!skyCanvas || !skyCtx) return;
-  resizeSky();
+  resizeSky(true);
   // Estrellas distribuidas en toda la pantalla.
   // Se evita solo el último borde inferior para que no aparezca el efecto tipo "pincel".
   skyStars = Array.from({length: SKY_STAR_COUNT}, () => ({
@@ -441,26 +462,36 @@ function initSky(){
 }
 
 function getSkySize(){
-  // v24: el cielo es SIEMPRE el viewport visible.
-  // No usa scrollHeight porque al abrir/cerrar el panel cambiaba el tamaño del canvas,
-  // provocando parpadeos y que las estrellas parecieran achicarse/agrandarse.
-  const vw = Math.max(1, window.innerWidth || document.documentElement.clientWidth || 1);
-  const vh = Math.max(1, window.innerHeight || document.documentElement.clientHeight || 1);
-  return { w: vw, h: vh };
+  return skySize;
 }
 
-function resizeSky(){
+function resizeSky(force = false){
   if(!skyCanvas || !skyCtx) return;
-  const dpr = Math.min(window.devicePixelRatio || 1, 1.8);
-  const { w, h } = getSkySize();
-  skyCanvas.style.width = `100vw`;
-  skyCanvas.style.height = `100dvh`;
-  skyCanvas.width = Math.floor(w * dpr);
-  skyCanvas.height = Math.floor(h * dpr);
+  const vw = Math.max(1, window.innerWidth || document.documentElement.clientWidth || 1);
+  const vh = Math.max(1, window.innerHeight || document.documentElement.clientHeight || 1);
+
+  // En móviles, al hacer scroll el navegador cambia levemente la altura visible por la barra superior.
+  // Si redimensionamos el canvas en cada microcambio, el cielo se deforma y el scroll se vuelve lento.
+  // Por eso se ignoran cambios pequeños de altura mientras la escena de Chile está activa.
+  const widthChanged = Math.abs(vw - skySize.w) > 2;
+  const heightChanged = Math.abs(vh - skySize.h) > (document.body.classList.contains('map-active') ? 110 : 2);
+  if(!force && !widthChanged && !heightChanged) return;
+
+  const dpr = Math.min(window.devicePixelRatio || 1, HIGH_POWER ? 1.5 : MID_POWER ? 1.2 : 1);
+  skySize = { w: vw, h: vh, dpr };
+  skyCanvas.style.width = `${vw}px`;
+  skyCanvas.style.height = `${vh}px`;
+  skyCanvas.width = Math.floor(vw * dpr);
+  skyCanvas.height = Math.floor(vh * dpr);
   skyCtx.setTransform(dpr,0,0,dpr,0,0);
 }
-window.addEventListener('resize', () => requestAnimationFrame(resizeSky), { passive:true });
-window.addEventListener('orientationchange', () => setTimeout(resizeSky, 180), { passive:true });
+function scheduleSkyResize(force = false){
+  if(skyResizeRaf) cancelAnimationFrame(skyResizeRaf);
+  skyResizeRaf = requestAnimationFrame(() => { resizeSky(force); skyResizeRaf = null; });
+}
+window.addEventListener('resize', () => scheduleSkyResize(false), { passive:true });
+window.addEventListener('orientationchange', () => setTimeout(() => resizeSky(true), 220), { passive:true });
+window.addEventListener('scroll', () => { scrollFreezeUntil = performance.now() + 180; }, { passive:true });
 
 function drawSky(now){
   requestAnimationFrame(drawSky);
@@ -475,6 +506,9 @@ function drawSky(now){
   if(!mapScene.classList.contains('is-visible')){
     skyStartTime = null;
     shootingStars = [];
+    return;
+  }
+  if(LOW_POWER && performance.now() < scrollFreezeUntil){
     return;
   }
   if(!skyStartTime) skyStartTime = now;
@@ -582,7 +616,7 @@ function drawConstellations(w,h,progress,elapsed,lineOpacity){
 
 function updateShootingStars(elapsed,w,h){
   // Estrellas fugaces ocasionales, solo en la zona alta/media para que no ensucien el borde inferior.
-  if(!LOW_POWER && elapsed - lastShootingStar > 14000 + Math.random()*12000){
+  if(HIGH_POWER && elapsed - lastShootingStar > 14000 + Math.random()*12000){
     lastShootingStar = elapsed;
     playSound('shoot');
     shootingStars.push({
