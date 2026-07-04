@@ -2,6 +2,16 @@ import * as THREE from 'three';
 
 const RED = 0xe92323;
 const RED_STRONG = 0xff302b;
+
+// v29: modo rendimiento automático para celulares/equipos de gama baja.
+// Mantiene la experiencia visual, pero baja carga de GPU/CPU cuando el dispositivo lo necesita.
+const DEVICE_MEMORY = navigator.deviceMemory || 4;
+const CPU_CORES = navigator.hardwareConcurrency || 4;
+const SAVE_DATA = !!navigator.connection?.saveData;
+const REDUCED_MOTION = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches || false;
+const LOW_POWER = SAVE_DATA || REDUCED_MOTION || DEVICE_MEMORY <= 3 || CPU_CORES <= 4 || Math.min(window.innerWidth, window.innerHeight) <= 430;
+document.documentElement.classList.toggle('perf-lite', LOW_POWER);
+
 const canvas = document.getElementById('planetCanvas');
 const trigger = document.getElementById('planetTrigger');
 const intro = document.getElementById('intro');
@@ -31,8 +41,13 @@ const CHILE_LON = -70.66;
 const CHILE_TARGET_ROTATION_Y = THREE.MathUtils.degToRad(-(CHILE_LON + 90));
 const CHILE_TARGET_ROTATION_X = THREE.MathUtils.degToRad(CHILE_LAT);
 
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: 'high-performance' });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.8));
+const renderer = new THREE.WebGLRenderer({
+  canvas,
+  antialias: !LOW_POWER,
+  alpha: true,
+  powerPreference: LOW_POWER ? 'low-power' : 'high-performance'
+});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, LOW_POWER ? 1 : 1.25));
 renderer.setClearColor(0x000000, 0);
 
 const scene = new THREE.Scene();
@@ -45,11 +60,13 @@ scene.add(globeGroup);
 const loader = new THREE.TextureLoader();
 const worldTexture = loader.load('assets/textures/world-map-red.png');
 worldTexture.colorSpace = THREE.SRGBColorSpace;
-worldTexture.anisotropy = 8;
+worldTexture.anisotropy = LOW_POWER ? 1 : 4;
 worldTexture.wrapS = THREE.RepeatWrapping;
 worldTexture.wrapT = THREE.ClampToEdgeWrapping;
 
-const earthGeo = new THREE.SphereGeometry(1, 128, 128);
+const SPHERE_SEGMENTS = LOW_POWER ? 48 : 96;
+const CLOUD_SEGMENTS = LOW_POWER ? 40 : 72;
+const earthGeo = new THREE.SphereGeometry(1, SPHERE_SEGMENTS, SPHERE_SEGMENTS);
 const earthMat = new THREE.MeshStandardMaterial({
   color: 0x180303,
   map: worldTexture,
@@ -80,11 +97,11 @@ function createChileMarker(){
   g.position.copy(latLonToVector3(CHILE_LAT, CHILE_LON));
   g.lookAt(new THREE.Vector3(0,0,0));
   const dot = new THREE.Mesh(
-    new THREE.SphereGeometry(0.018, 24, 24),
+    new THREE.SphereGeometry(0.018, LOW_POWER ? 12 : 24),
     new THREE.MeshBasicMaterial({ color: RED_STRONG, transparent:true, opacity:.96, blending:THREE.AdditiveBlending })
   );
   const ring = new THREE.Mesh(
-    new THREE.RingGeometry(0.032, 0.052, 48),
+    new THREE.RingGeometry(0.032, 0.052, LOW_POWER ? 24 : 48),
     new THREE.MeshBasicMaterial({ color: RED_STRONG, transparent:true, opacity:.7, side:THREE.DoubleSide, blending:THREE.AdditiveBlending })
   );
   ring.rotation.x = Math.PI / 2;
@@ -94,37 +111,37 @@ function createChileMarker(){
 
 const cloudTexture = createCloudTexture();
 const clouds = new THREE.Mesh(
-  new THREE.SphereGeometry(1.012, 96, 96),
-  new THREE.MeshBasicMaterial({ map: cloudTexture, transparent: true, opacity: 0.16, depthWrite: false, blending: THREE.AdditiveBlending })
+  new THREE.SphereGeometry(1.012, CLOUD_SEGMENTS, CLOUD_SEGMENTS),
+  new THREE.MeshBasicMaterial({ map: cloudTexture, transparent: true, opacity: LOW_POWER ? 0.09 : 0.16, depthWrite: false, blending: THREE.AdditiveBlending })
 );
 globeGroup.add(clouds);
 
 const atmosphere = new THREE.Mesh(
-  new THREE.SphereGeometry(1.04, 128, 128),
-  new THREE.MeshBasicMaterial({ color: RED_STRONG, transparent: true, opacity: 0.13, side: THREE.BackSide, blending: THREE.AdditiveBlending })
+  new THREE.SphereGeometry(1.04, SPHERE_SEGMENTS, SPHERE_SEGMENTS),
+  new THREE.MeshBasicMaterial({ color: RED_STRONG, transparent: true, opacity: LOW_POWER ? 0.08 : 0.13, side: THREE.BackSide, blending: THREE.AdditiveBlending })
 );
 globeGroup.add(atmosphere);
 
 const rim = new THREE.Mesh(
-  new THREE.SphereGeometry(1.025, 128, 128),
-  new THREE.MeshBasicMaterial({ color: RED_STRONG, transparent: true, opacity: 0.055, wireframe: false, blending: THREE.AdditiveBlending })
+  new THREE.SphereGeometry(1.025, SPHERE_SEGMENTS, SPHERE_SEGMENTS),
+  new THREE.MeshBasicMaterial({ color: RED_STRONG, transparent: true, opacity: LOW_POWER ? 0.028 : 0.055, wireframe: false, blending: THREE.AdditiveBlending })
 );
 globeGroup.add(rim);
 
 const stars = createStars();
 scene.add(stars);
 
-const keyLight = new THREE.PointLight(RED_STRONG, 38, 9);
+const keyLight = new THREE.PointLight(RED_STRONG, LOW_POWER ? 24 : 38, 9);
 keyLight.position.set(2.5, 1.1, 2.5);
 scene.add(keyLight);
-const fillLight = new THREE.AmbientLight(0x3a0505, 2.2);
+const fillLight = new THREE.AmbientLight(0x3a0505, LOW_POWER ? 1.65 : 2.2);
 scene.add(fillLight);
 
 function createCloudTexture(){
-  const c = document.createElement('canvas'); c.width = 1024; c.height = 512;
+  const c = document.createElement('canvas'); c.width = LOW_POWER ? 512 : 1024; c.height = LOW_POWER ? 256 : 512;
   const ctx = c.getContext('2d');
   ctx.clearRect(0,0,c.width,c.height);
-  for(let i=0;i<120;i++){
+  for(let i=0;i<(LOW_POWER ? 38 : 100);i++){
     const x=Math.random()*c.width, y=Math.random()*c.height, rx=40+Math.random()*130, ry=8+Math.random()*22;
     const g=ctx.createRadialGradient(x,y,0,x,y,rx);
     g.addColorStop(0,'rgba(255,210,210,.22)'); g.addColorStop(1,'rgba(255,210,210,0)');
@@ -134,7 +151,7 @@ function createCloudTexture(){
 }
 
 function createStars(){
-  const count = 900;
+  const count = LOW_POWER ? 240 : 620;
   const geo = new THREE.BufferGeometry();
   const pos = new Float32Array(count * 3);
   for(let i=0;i<count;i++){
@@ -165,13 +182,14 @@ function closestEquivalentAngle(from, target){
 function lerpAngle(a,b,t){ return a + (b-a)*t; }
 
 function animate(time){
+  if(mapOpened && !isTransitioning) return;
   requestAnimationFrame(animate);
   const t = time * 0.001;
 
   if(!isTransitioning && !mapOpened){
     earth.rotation.y += 0.0017;
     clouds.rotation.y += 0.0028;
-    stars.rotation.z += 0.00005;
+    if(!LOW_POWER) stars.rotation.z += 0.00005;
   }
 
   if(isTransitioning && transitionState){
@@ -363,6 +381,9 @@ let skyStars = [];
 let shootingStars = [];
 let skyStartTime = null;
 let lastShootingStar = 0;
+let lastSkyDraw = 0;
+const SKY_FPS = LOW_POWER ? 18 : 30;
+const SKY_STAR_COUNT = LOW_POWER ? 360 : 760;
 const constellationDrawDuration = 30000;
 const constellationHoldDuration = 4500;
 const constellationFadeDuration = 6500;
@@ -406,7 +427,7 @@ function initSky(){
   resizeSky();
   // Estrellas distribuidas en toda la pantalla.
   // Se evita solo el último borde inferior para que no aparezca el efecto tipo "pincel".
-  skyStars = Array.from({length: 980}, () => ({
+  skyStars = Array.from({length: SKY_STAR_COUNT}, () => ({
     // Distribución full-screen real: cubre también bordes y esquina inferior derecha.
     x: Math.random(),
     y: Math.random(),
@@ -444,6 +465,8 @@ window.addEventListener('orientationchange', () => setTimeout(resizeSky, 180), {
 function drawSky(now){
   requestAnimationFrame(drawSky);
   if(!skyCanvas || !skyCtx) return;
+  if(now - lastSkyDraw < 1000 / SKY_FPS) return;
+  lastSkyDraw = now;
   const size = getSkySize();
   const w = size.w;
   const h = size.h;
@@ -559,7 +582,7 @@ function drawConstellations(w,h,progress,elapsed,lineOpacity){
 
 function updateShootingStars(elapsed,w,h){
   // Estrellas fugaces ocasionales, solo en la zona alta/media para que no ensucien el borde inferior.
-  if(elapsed - lastShootingStar > 9000 + Math.random()*9000){
+  if(!LOW_POWER && elapsed - lastShootingStar > 14000 + Math.random()*12000){
     lastShootingStar = elapsed;
     playSound('shoot');
     shootingStars.push({

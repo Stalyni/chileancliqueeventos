@@ -1300,3 +1300,48 @@ html, body{
     line-height:1.25 !important;
   }
 }
+
+/* v29: optimización para dispositivos de gama baja.
+   No cambia la experiencia ni los textos; baja efectos costosos cuando el equipo lo necesita. */
+html.perf-lite .grain,
+html.perf-lite .stars{
+  opacity:.28 !important;
+}
+html.perf-lite .planet-stage,
+html.perf-lite .chile-svg-mount,
+html.perf-lite .mini-logo,
+html.perf-lite .clique-logo,
+html.perf-lite .event-panel,
+html.perf-lite .sound-toggle,
+html.perf-lite .social-link{
+  filter:none !important;
+  -webkit-filter:none !important;
+  backdrop-filter:none !important;
+  -webkit-backdrop-filter:none !important;
+}
+html.perf-lite .chile-svg-mount,
+html.perf-lite .map-scene.map-ready .chile-svg-mount,
+html.perf-lite .site-header .mini-logo,
+html.perf-lite .intro-brand .clique-logo,
+html.perf-lite .chile-svg-mount svg path[data-event="true"]{
+  animation:none !important;
+}
+html.perf-lite .event-panel{
+  background:rgba(8,4,4,.92) !important;
+  box-shadow:0 0 22px rgba(233,35,35,.12) !important;
+}
+html.perf-lite .chile-svg-mount svg path[data-event="true"]:hover,
+html.perf-lite .chile-svg-mount svg path.is-active{
+  transform:none !important;
+  filter:none !important;
+}
+html.perf-lite .social-link:hover,
+html.perf-lite .sound-toggle:hover{
+  transform:none !important;
+}
+
+/* Evita saltos de layout y mantiene canvas estable en cualquier equipo. */
+#planetCanvas,
+#skyCanvas{
+  contain:strict;
+}
