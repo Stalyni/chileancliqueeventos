@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Chilean Clique Listening Events Chile" />
+  <meta property="og:title" content="Chilean Clique | Listening Events" />
+  <meta property="og:description" content="Eventos Chilean Clique en Chile" />
+  <meta property="og:type" content="website" />
+  <meta name="theme-color" content="#e92323" />
+  <link rel="icon" href="assets/svg/chilean-clique-logo.svg" />
+  <title>Chilean Clique | Eventos</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <script type="importmap">
+    { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }
+  </script>
+</head>
+<body>
+  <main id="app" class="app">
+    <nav class="social-links" aria-label="Redes sociales de Chilean Clique">
+      <a class="social-link" href="https://www.instagram.com/chilean.clique/" target="_blank" rel="noopener noreferrer" aria-label="Instagram Chilean Clique" title="Instagram">
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M7.8 2h8.4A5.8 5.8 0 0 1 22 7.8v8.4a5.8 5.8 0 0 1-5.8 5.8H7.8A5.8 5.8 0 0 1 2 16.2V7.8A5.8 5.8 0 0 1 7.8 2Zm0 2A3.8 3.8 0 0 0 4 7.8v8.4A3.8 3.8 0 0 0 7.8 20h8.4a3.8 3.8 0 0 0 3.8-3.8V7.8A3.8 3.8 0 0 0 16.2 4H7.8Zm4.2 3.2a4.8 4.8 0 1 1 0 9.6 4.8 4.8 0 0 1 0-9.6Zm0 2a2.8 2.8 0 1 0 0 5.6 2.8 2.8 0 0 0 0-5.6Zm5.05-2.1a1.15 1.15 0 1 1 0 2.3 1.15 1.15 0 0 1 0-2.3Z"/>
+        </svg>
+        <span>Instagram</span>
+      </a>
+    </nav>
+    <button id="soundToggle" class="sound-toggle" type="button" aria-label="Activar sonido" aria-pressed="false">SOUND OFF</button>
+    <section id="intro" class="intro" aria-label="Planeta girando">
+      <div class="grain" aria-hidden="true"></div>
+      <div class="stars" aria-hidden="true"></div>
+
+      <div class="intro-copy">
+        <p class="eyebrow">CHILEAN CLIQUE PRESENTA</p>
+        <h1>ONCEAVO<br>ANIVERSARIO</h1>
+        <p class="hint">Presiona el planeta.</p>
+      </div>
+
+      <button id="planetTrigger" class="planet-stage" type="button" aria-label="Ir a Chile">
+        <canvas id="planetCanvas"></canvas>
+      </button>
+
+      <div class="intro-brand" aria-hidden="true">
+        <img class="clique-logo" src="assets/svg/chilean-clique-logo.svg" alt="Chilean Clique" />
+        <p>CHILEAN CLIQUE</p>
+      </div>
+    </section>
+
+    <section id="mapScene" class="map-scene" aria-label="Mapa de Chile con eventos">
+      <canvas id="skyCanvas" class="sky-canvas" aria-hidden="true"></canvas>
+      <div class="grain" aria-hidden="true"></div>
+      <header class="site-header">
+        <img class="mini-logo" src="assets/svg/chilean-clique-logo.svg" alt="Chilean Clique" />
+        <span>CHILEAN CLIQUE</span>
+      </header>
+
+      <div class="map-layout">
+        <aside class="map-copy">
+          <p class="eyebrow">CHILE</p>
+          <h2><span>EVENTO</span><br><span>PROGRAMADO</span></h2>
+          <p>revisa las ciudades con eventos.</p>
+        </aside>
+
+        <div id="chileMapWrap" class="chile-map-wrap" aria-label="Chile interactivo">
+          <div id="chileSvgMount" class="chile-svg-mount"></div>
+        </div>
+
+        <aside id="eventPanel" class="event-panel" aria-live="polite">
+          <p id="panelStatus" class="panel-status">CIUDAD CON EVENTO</p>
+          <h3 id="eventCity">SANTIAGO</h3>
+          <p class="panel-subtitle">REGIÓN METROPOLITANA</p>
+
+          <div class="event-details">
+            <p><span>📍</span><strong id="eventPlace">Lugar por confirmar</strong></p>
+            <p><span>📅</span><strong>22 de agosto de 2026</strong></p>
+            <p><span>⏰</span><strong>15:00 hrs</strong></p>
+          </div>
+
+          <div id="countdown" class="countdown" hidden>
+            <p>FALTAN</p>
+            <div id="countdownGrid" class="countdown-grid"></div>
+          </div>
+        </aside>
+      </div>
+
+      <footer class="map-footer">
+        <span class="mouse-icon" aria-hidden="true"></span>
+        <p>Usa tu cursor para explorar el mapa</p>
+      </footer>
+    </section>
+  </main>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
