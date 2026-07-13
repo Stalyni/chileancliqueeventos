@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { EVENTS, EVENTS_BY_REGION } from './events.js';
 
 const RED = 0xe92323;
 const RED_STRONG = 0xff302b;
@@ -41,6 +42,11 @@ const chileSvgMount = document.getElementById('chileSvgMount');
 const soundToggle = document.getElementById('soundToggle');
 const panelStatus = document.getElementById('panelStatus');
 const eventCity = document.getElementById('eventCity');
+const eventRegion = document.getElementById('eventRegion');
+const eventPlace = document.getElementById('eventPlace');
+const eventAddress = document.getElementById('eventAddress');
+const eventDate = document.getElementById('eventDate');
+const eventTime = document.getElementById('eventTime');
 
 let isTransitioning = false;
 let mapOpened = false;
@@ -51,6 +57,7 @@ let panelPinned = false;
 let activeRegion = null;
 let panelTimer = null;
 let transitionState = null;
+let currentEvent = EVENTS[0] || null;
 const CHILE_LAT = -33.45;
 const CHILE_LON = -70.66;
 // Three.js SphereGeometry pone el meridiano visible en U=.25.
@@ -285,8 +292,10 @@ function startZoomToChile(){
 
 async function loadChileSvg(){
   const res = await fetch('assets/svg/chile_clancy_ciudades.svg');
+  if(!res.ok) throw new Error(`No se pudo cargar el mapa de Chile (${res.status})`);
   const svgText = await res.text();
   chileSvgMount.innerHTML = svgText;
+
   const svg = chileSvgMount.querySelector('svg');
   if(svg){
     const w = svg.getAttribute('width');
@@ -294,39 +303,76 @@ async function loadChileSvg(){
     if(!svg.getAttribute('viewBox') && w && h){
       svg.setAttribute('viewBox', `0 0 ${parseFloat(w)} ${parseFloat(h)}`);
     }
-    svg.removeAttribute('width'); svg.removeAttribute('height');
+    svg.removeAttribute('width');
+    svg.removeAttribute('height');
     svg.setAttribute('preserveAspectRatio','xMidYMid meet');
   }
+
   const paths = [...chileSvgMount.querySelectorAll('path')];
-  paths.forEach(p => {
-    p.removeAttribute('style');
-    p.setAttribute('tabindex','-1');
-    p.setAttribute('aria-label', p.getAttribute('title') || p.id || 'Región de Chile');
+  paths.forEach((path) => {
+    path.removeAttribute('style');
+    path.setAttribute('tabindex','-1');
+    path.setAttribute('aria-label', path.getAttribute('title') || path.id || 'Región de Chile');
   });
-  const santiago = paths.find(p => ['CL-RM','RM','santiago','metropolitana'].some(id => (p.id || '').toLowerCase().includes(id.toLowerCase())) ) || paths.find(p => (p.getAttribute('title') || '').toLowerCase().includes('metropolitana'));
-  if(santiago){
-    santiago.dataset.event = 'true';
-    santiago.id = santiago.id || 'CL-RM';
-    santiago.setAttribute('tabindex','0');
-    santiago.addEventListener('mouseenter', openEvent);
-    santiago.addEventListener('mouseleave', closeEvent);
-    santiago.addEventListener('click', toggleEvent);
-    santiago.addEventListener('focus', openEvent);
-    santiago.addEventListener('blur', closeEvent);
+
+  for(const event of EVENTS){
+    if(!event.active) continue;
+    const region = chileSvgMount.querySelector(`#${CSS.escape(event.regionId)}`);
+    if(!region){
+      console.warn(`No se encontró la región ${event.regionId} para ${event.city}`);
+      continue;
+    }
+
+    region.dataset.event = 'true';
+    region.dataset.eventId = event.id;
+    region.setAttribute('tabindex','0');
+    region.setAttribute('role','button');
+    region.setAttribute('aria-label', `${event.city}: ${event.venue}, ${event.dateLabel}, ${event.timeLabel}`);
+    region.addEventListener('mouseenter', openEvent);
+    region.addEventListener('mouseleave', closeEvent);
+    region.addEventListener('click', toggleEvent);
+    region.addEventListener('focus', openEvent);
+    region.addEventListener('blur', closeEvent);
   }
 }
-loadChileSvg();
+loadChileSvg().catch((error) => console.error(error));
+
+function getEventFromRegion(region){
+  return region ? EVENTS_BY_REGION.get(region.id) || null : null;
+}
+
+function renderEvent(event){
+  if(!event) return;
+  currentEvent = event;
+  eventCity.textContent = event.city.toUpperCase();
+  eventRegion.textContent = event.region.toUpperCase();
+  eventPlace.textContent = event.venue;
+  eventAddress.textContent = event.address;
+  eventDate.textContent = event.dateLabel;
+  eventTime.textContent = event.timeLabel;
+  eventPanel.dataset.eventId = event.id;
+  eventPanel.dataset.panelSide = event.panelSide;
+  panelStatus.textContent = 'CIUDAD CON EVENTO';
+  mapScene.classList.remove('is-now-playing');
+}
 
 function openEvent(e){
-  activeRegion = e.currentTarget;
+  const region = e.currentTarget;
+  const event = getEventFromRegion(region);
+  if(!event) return;
+
+  if(activeRegion && activeRegion !== region){
+    activeRegion.classList.remove('is-active');
+  }
+  activeRegion = region;
   activeRegion.classList.add('is-active');
+  renderEvent(event);
   eventPanel.classList.add('is-open');
   countdown.hidden = false;
   activeCountdown = true;
   updateCountdown();
-
-  // v24: no redimensionar el cielo al abrir panel; evita parpadeos y cambios de escala.
 }
+
 function closeEvent(e){
   if(panelPinned) return;
   const region = e?.currentTarget || activeRegion;
@@ -334,8 +380,8 @@ function closeEvent(e){
   eventPanel.classList.remove('is-open');
   countdown.hidden = true;
   activeCountdown = false;
-  // v24: no redimensionar el cielo al cerrar panel.
 }
+
 function hidePinnedEvent(){
   panelPinned = false;
   if(activeRegion) activeRegion.classList.remove('is-active');
@@ -343,11 +389,11 @@ function hidePinnedEvent(){
   countdown.hidden = true;
   activeCountdown = false;
 }
+
 function toggleEvent(e){
   const region = e.currentTarget;
 
-  // Si la ciudad ya estaba marcada por click, el segundo click la desmarca al tiro.
-  if (panelPinned && activeRegion === region && eventPanel.classList.contains('is-open')) {
+  if(panelPinned && activeRegion === region && eventPanel.classList.contains('is-open')){
     clearTimeout(panelTimer);
     hidePinnedEvent();
     playSound('tick');
@@ -358,36 +404,44 @@ function toggleEvent(e){
   playSound('tick');
   panelPinned = true;
   clearTimeout(panelTimer);
-
-  // En móviles y ventanas pequeñas queda visible 40 segundos y luego se desvanece.
   panelTimer = setTimeout(hidePinnedEvent, 40000);
 }
 
-const targetDate = new Date('2026-08-22T15:00:00-04:00');
 function updateCountdown(){
-  if(!activeCountdown) return;
+  if(!activeCountdown || !currentEvent) return;
+  const targetDate = new Date(currentEvent.date);
   const diff = Math.max(0, targetDate.getTime() - Date.now());
   const totalSeconds = Math.floor(diff / 1000);
   const days = Math.floor(totalSeconds / 86400);
   const hours = Math.floor((totalSeconds % 86400) / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
   const seconds = totalSeconds % 60;
+
   if(diff === 0){
     mapScene.classList.add('is-now-playing');
-    if(panelStatus) panelStatus.textContent = 'EVENTO EN CURSO';
-    if(eventCity) eventCity.textContent = 'NOW PLAYING';
+    panelStatus.textContent = 'EVENTO EN CURSO';
   }else{
     mapScene.classList.remove('is-now-playing');
-    if(panelStatus) panelStatus.textContent = 'CIUDAD CON EVENTO';
-    if(eventCity) eventCity.textContent = 'SANTIAGO';
+    panelStatus.textContent = 'CIUDAD CON EVENTO';
   }
+
   const units = days >= 1
     ? [['DÍA', days], ['HORAS', hours], ['MINUTOS', minutes], ['SEGUNDOS', seconds]]
     : [['HORAS', hours], ['MINUTOS', minutes], ['SEGUNDOS', seconds]];
-  countdownGrid.innerHTML = units.map(([label, value]) => `<div class="time-box"><strong>${String(value).padStart(2,'0')}</strong><span>${label}</span></div>`).join('');
+
+  countdownGrid.replaceChildren();
+  for(const [label, value] of units){
+    const box = document.createElement('div');
+    box.className = 'time-box';
+    const strong = document.createElement('strong');
+    strong.textContent = String(value).padStart(2,'0');
+    const span = document.createElement('span');
+    span.textContent = label;
+    box.append(strong, span);
+    countdownGrid.append(box);
+  }
 }
 setInterval(updateCountdown, 1000);
-
 
 // ------------------------------------------------------------
 // Cielo Chilean Clique: estrellas estáticas con parpadeo,

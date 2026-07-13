@@ -30,3 +30,8 @@ Para Render:
 - Enlaces con `target="_blank"` y `rel="noopener noreferrer"`.
 - Contador actualizado al 22 de agosto de 2026 a las 15:00 hrs Chile.
 - Cambiar el enlace de WhatsApp en `index.html` cuando tengas la invitación final.
+
+## v33 — ciudades con eventos
+Los eventos se administran desde `js/events.js`.
+Ciudades activas: Santiago, Concepción, Viña del Mar y Temuco.
+Cada ciudad tiene lugar, dirección, fecha, hora y contador independiente.

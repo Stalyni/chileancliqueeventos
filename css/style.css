@@ -1641,3 +1641,23 @@ body.map-active{
   transform-box:fill-box !important;
   transform-origin:center !important;
 }
+
+/* v33: múltiples ciudades con evento */
+.chile-svg-mount svg path[data-event="true"]{
+  cursor:pointer;
+  transform-box:fill-box;
+  transform-origin:center;
+  transition:fill .22s ease, opacity .22s ease, filter .22s ease, transform .22s ease;
+}
+.chile-svg-mount svg path[data-event="true"]:focus-visible{
+  outline:none;
+  fill:#b80f16 !important;
+  filter:drop-shadow(0 0 16px rgba(255,48,43,.95));
+}
+.event-details p strong{
+  overflow-wrap:anywhere;
+}
+@media (max-width:430px){
+  .event-details{gap:7px !important;}
+  .event-details p{line-height:1.25 !important;}
+}
