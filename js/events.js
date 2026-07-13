@@ -4,7 +4,7 @@ export const EVENTS = Object.freeze([
     regionId: 'CL-RM',
     city: 'Santiago',
     region: 'Región Metropolitana',
-    venue: 'Sexta Av. 1197, San Miguel',
+    venue: 'COCO CAFE',
     address: 'Sexta Av. 1197, San Miguel',
     date: '2026-08-22T15:00:00-04:00',
     dateLabel: '22 de agosto de 2026',
